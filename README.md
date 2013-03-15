@@ -1,10 +1,8 @@
-PRTRop
+PRT ROP For Houdini
 
 Brought to you by Robotika (robotika.com.tr) and Fiction
 
 ======
-
-PRT ROP For Houdini
 
 - Clone this repo into you computer
 - Open houdini Command Line Tools

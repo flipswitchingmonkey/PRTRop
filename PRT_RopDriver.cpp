@@ -29,6 +29,7 @@
 #include <UT/UT_Vector3.h>
 #include <UT/UT_Vector4.h>
 
+#include <ROP/ROP_Node.h>
 #include <ROP/ROP_Error.h>
 #include <ROP/ROP_Templates.h>
 
@@ -75,6 +76,7 @@ enum {
     PRT_ROP_TPOSTRENDER,
     PRT_ROP_POSTRENDER,
     PRT_ROP_LPOSTRENDER,
+    PRT_ROP_MKPATH,
     PRT_ROP_INITSIM,
     
     PRT_ROP_MAXPARMS
@@ -87,6 +89,7 @@ static PRM_Default      PRM_DEFAULT_TRUE_INT( 1, "" );
 
 static PRM_Name         FILE_PRM_NAME( "file", "File" );
 static PRM_Name         SOP_PATH_PRM_NAME("soppath",  "SOP Path");
+static PRM_Name         MKPATH_PRM_NAME( "mkpath", "Create Intermediate Directories" );
 static PRM_Name         INITSIM_PRM_NAME( "initsim", "Initialize Simulation OPs" );
 
 static PRM_Name         AUTO_UPDATE_ATTRIBS_PRM_NAME("autoAttribs",  "Auto Update Attributes");
@@ -309,6 +312,7 @@ static PRM_Template * getTemplates()
     prmTemplate[PRT_ROP_TPOSTRENDER]        = theRopTemplates[ROP_TPOSTRENDER_TPLATE];
     prmTemplate[PRT_ROP_POSTRENDER]         = theRopTemplates[ROP_POSTRENDER_TPLATE];
     prmTemplate[PRT_ROP_LPOSTRENDER]        = theRopTemplates[ROP_LPOSTRENDER_TPLATE];
+    prmTemplate[PRT_ROP_MKPATH]             = theRopTemplates[ROP_MKPATH_TPLATE];
     prmTemplate[PRT_ROP_INITSIM]            = theRopTemplates[ROP_INITSIM_TPLATE];
     
     prmTemplate[PRT_ROP_MAXPARMS]           = PRM_Template();
@@ -432,6 +436,11 @@ ROP_RENDER_CODE PRT_RopDriver::renderFrame( fpreal time, UT_Interrupt *boss )
         return ROP_ABORT_RENDER;
     }
     
+    if( evalInt("mkpath", 0, 0) )
+    {
+        ROP_Node::makeFilePathDirs(filePath);
+    }
+
     PRTFile::PRTFile                    prtFile( gdpPtr->points().entries() );
     
     int attributeCount  = evalInt( ATTRIBS_PRM_NAME.getToken(), 0, time );

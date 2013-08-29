@@ -34,7 +34,8 @@ protected:
     virtual ROP_RENDER_CODE endRender();
     
 private:
-    
+
+    fpreal  startTime;
     fpreal  endTime;
 };
 

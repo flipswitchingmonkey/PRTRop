@@ -29,6 +29,7 @@
 #include <UT/UT_Vector3.h>
 #include <UT/UT_Vector4.h>
 
+#include <ROP/ROP_Node.h>
 #include <ROP/ROP_Error.h>
 #include <ROP/ROP_Templates.h>
 
@@ -75,6 +76,9 @@ enum {
     PRT_ROP_TPOSTRENDER,
     PRT_ROP_POSTRENDER,
     PRT_ROP_LPOSTRENDER,
+    PRT_ROP_MKPATH,
+    PRT_ROP_INITSIM,
+    PRT_ROP_ALFPROGRESS,
     
     PRT_ROP_MAXPARMS
 };
@@ -83,9 +87,13 @@ enum {
 static PRM_Default      FILE_PRM_DEFAULT( 0, "out$F.prt" );
 static PRM_Default      PRM_DEFAULT_EMPTY_STR( 0, "" );
 static PRM_Default      PRM_DEFAULT_TRUE_INT( 1, "" );
+static PRM_Default      PRM_DEFAULT_FALSE_INT( 0, "" );
 
 static PRM_Name         FILE_PRM_NAME( "file", "File" );
 static PRM_Name         SOP_PATH_PRM_NAME("soppath",  "SOP Path");
+static PRM_Name         MKPATH_PRM_NAME( "mkpath", "Create Intermediate Directories" );
+static PRM_Name         INITSIM_PRM_NAME( "initsim", "Initialize Simulation OPs" );
+static PRM_Name         ALFPROGRESS_PRM_NAME( "alfprogress", "Alfred Style Progress" );
 
 static PRM_Name         AUTO_UPDATE_ATTRIBS_PRM_NAME("autoAttribs",  "Auto Update Attributes");
 static PRM_Name         REFRESH_ATTRIBS_PRM_NAME("refreshAttribs",  "Refresh Attributes");
@@ -307,6 +315,9 @@ static PRM_Template * getTemplates()
     prmTemplate[PRT_ROP_TPOSTRENDER]        = theRopTemplates[ROP_TPOSTRENDER_TPLATE];
     prmTemplate[PRT_ROP_POSTRENDER]         = theRopTemplates[ROP_POSTRENDER_TPLATE];
     prmTemplate[PRT_ROP_LPOSTRENDER]        = theRopTemplates[ROP_LPOSTRENDER_TPLATE];
+    prmTemplate[PRT_ROP_MKPATH]             = theRopTemplates[ROP_MKPATH_TPLATE];
+    prmTemplate[PRT_ROP_INITSIM]            = theRopTemplates[ROP_INITSIM_TPLATE];
+    prmTemplate[PRT_ROP_ALFPROGRESS]        = PRM_Template( PRM_TOGGLE, 1, &ALFPROGRESS_PRM_NAME, PRMzeroDefaults );
     
     prmTemplate[PRT_ROP_MAXPARMS]           = PRM_Template();
     
@@ -365,7 +376,13 @@ int PRT_RopDriver::startRender( int nframes, fpreal s, fpreal e )
     
     evalString( sopPath, PRT_ROP_SOPPATH, 0, s );
     evalString( filePath, PRT_ROP_FILE, 0, s );
-    
+
+    if( evalInt("initsim", 0, 0) )
+    {
+        initSimulationOPs();
+        OPgetDirector()->bumpSkipPlaybarBasedSimulationReset(1);
+    }
+
     if( !sopPath.isstring() )
     {
         addError( ROP_COOK_ERROR, "Invalid Sop Path" );
@@ -388,7 +405,8 @@ int PRT_RopDriver::startRender( int nframes, fpreal s, fpreal e )
         
         return 0;
     }
-    
+
+    startTime = s;
     endTime = e;
     
     if( error() < UT_ERROR_ABORT )
@@ -422,7 +440,22 @@ ROP_RENDER_CODE PRT_RopDriver::renderFrame( fpreal time, UT_Interrupt *boss )
         
         return ROP_ABORT_RENDER;
     }
-    
+
+    if( evalInt("alfprogress", 0, 0) && startTime<endTime )
+    {
+        // (from ROP_Field3D.C)
+        fpreal  fpercent = (time - startTime) / (endTime - startTime);
+        int     percent = (int)SYSrint(fpercent * 100);
+        percent = SYSclamp(percent, 0, 100);
+        fprintf(stdout, "ALF_PROGRESS %d%%\n", percent);
+        fflush(stdout);
+    }
+ 
+    if( evalInt("mkpath", 0, 0) )
+    {
+        ROP_Node::makeFilePathDirs(filePath);
+    }
+
     PRTFile::PRTFile                    prtFile( gdpPtr->points().entries() );
     
     int attributeCount  = evalInt( ATTRIBS_PRM_NAME.getToken(), 0, time );
@@ -576,6 +609,12 @@ ROP_RENDER_CODE PRT_RopDriver::renderFrame( fpreal time, UT_Interrupt *boss )
 
 ROP_RENDER_CODE PRT_RopDriver::endRender()
 {
+    if( evalInt("initsim", 0, 0) )
+    {
+        initSimulationOPs();
+	OPgetDirector()->bumpSkipPlaybarBasedSimulationReset(-1);
+    }
+
     if( error() < UT_ERROR_ABORT )
     {
         executePostRenderScript( endTime );

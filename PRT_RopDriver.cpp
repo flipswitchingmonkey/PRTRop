@@ -75,6 +75,7 @@ enum {
     PRT_ROP_TPOSTRENDER,
     PRT_ROP_POSTRENDER,
     PRT_ROP_LPOSTRENDER,
+    PRT_ROP_INITSIM,
     
     PRT_ROP_MAXPARMS
 };
@@ -86,6 +87,7 @@ static PRM_Default      PRM_DEFAULT_TRUE_INT( 1, "" );
 
 static PRM_Name         FILE_PRM_NAME( "file", "File" );
 static PRM_Name         SOP_PATH_PRM_NAME("soppath",  "SOP Path");
+static PRM_Name         INITSIM_PRM_NAME( "initsim", "Initialize Simulation OPs" );
 
 static PRM_Name         AUTO_UPDATE_ATTRIBS_PRM_NAME("autoAttribs",  "Auto Update Attributes");
 static PRM_Name         REFRESH_ATTRIBS_PRM_NAME("refreshAttribs",  "Refresh Attributes");
@@ -307,6 +309,7 @@ static PRM_Template * getTemplates()
     prmTemplate[PRT_ROP_TPOSTRENDER]        = theRopTemplates[ROP_TPOSTRENDER_TPLATE];
     prmTemplate[PRT_ROP_POSTRENDER]         = theRopTemplates[ROP_POSTRENDER_TPLATE];
     prmTemplate[PRT_ROP_LPOSTRENDER]        = theRopTemplates[ROP_LPOSTRENDER_TPLATE];
+    prmTemplate[PRT_ROP_INITSIM]            = theRopTemplates[ROP_INITSIM_TPLATE];
     
     prmTemplate[PRT_ROP_MAXPARMS]           = PRM_Template();
     
@@ -366,6 +369,12 @@ int PRT_RopDriver::startRender( int nframes, fpreal s, fpreal e )
     evalString( sopPath, PRT_ROP_SOPPATH, 0, s );
     evalString( filePath, PRT_ROP_FILE, 0, s );
     
+    if( evalInt("initsim", 0, 0) )
+    {
+        initSimulationOPs();
+        OPgetDirector()->bumpSkipPlaybarBasedSimulationReset(1);
+    }
+
     if( !sopPath.isstring() )
     {
         addError( ROP_COOK_ERROR, "Invalid Sop Path" );
@@ -576,6 +585,12 @@ ROP_RENDER_CODE PRT_RopDriver::renderFrame( fpreal time, UT_Interrupt *boss )
 
 ROP_RENDER_CODE PRT_RopDriver::endRender()
 {
+    if( evalInt("initsim", 0, 0) )
+    {
+        initSimulationOPs();
+	OPgetDirector()->bumpSkipPlaybarBasedSimulationReset(-1);
+    }
+
     if( error() < UT_ERROR_ABORT )
     {
         executePostRenderScript( endTime );
